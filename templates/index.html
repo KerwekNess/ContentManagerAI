@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Content Manager AI - Stealth Mode</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-main: #050505;
+            --bg-panel: #111111;
+            --border-color: #222222;
+            --text-main: #e0e0e0;
+            --text-dim: #666666;
+            --accent: #ffffff;
+        }
+
+        /* 1. Global Styles & Roundedness */
+        body { 
+            background-color: var(--bg-main); 
+            color: var(--text-main); 
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+            user-select: none; 
+        }
+        
+        input, textarea {
+            user-select: text !important;
+        }
+
+        h1, h3, h4 { font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 1px; }
+
+        .rounded-ui { border-radius: 12px; }
+
+        /* 2. VHS Scanline Effect */
+        body::before {
+            content: " ";
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            background-size: 100% 3px, 3px 100%;
+            pointer-events: none;
+            z-index: 200; 
+        }
+
+        /* 3. Panels & Elements */
+        .panel {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+        }
+        .panel:hover { border-color: #444; }
+
+        input {
+            background: #000 !important;
+            border: 1px solid #222 !important;
+            color: #fff !important;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.875rem;
+            transition: all 0.2s ease;
+            user-select: text !important;
+        }
+        input:focus {
+            border-color: var(--accent) !important;
+            outline: none;
+        }
+
+        /* 4. CUSTOM DROPDOWN (HUD Style) */
+        .custom-select {
+            position: relative;
+            width: 100%;
+        }
+        .select-trigger {
+            background: #000;
+            border: 1px solid #222;
+            padding: 12px;
+            font-size: 0.875rem;
+            font-family: 'JetBrains Mono', monospace;
+            color: #fff;
+            cursor: pointer;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s ease;
+        }
+        .select-trigger:hover { border-color: #444; }
+        .select-trigger::after {
+            content: '▼';
+            font-size: 10px;
+            color: #666;
+            transition: transform 0.3s ease;
+        }
+        .custom-select.open .select-trigger::after {
+            transform: rotate(180deg);
+        }
+        .options-list {
+            position: absolute;
+            top: calc(100% + 8px);
+            left: 0;
+            width: 100%;
+            background: #1a1a1a;
+            border: 1px solid #444;
+            border-radius: 12px;
+            z-index: 50;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 15px 30px rgba(0,0,0,0.5);
+        }
+        .custom-select.open .options-list {
+            display: flex;
+            animation: dropdown-down 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        @keyframes dropdown-down {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .option {
+            padding: 10px 14px;
+            font-size: 12px;
+            color: #aaa;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .option:hover {
+            background: #333;
+            color: #fff;
+            padding-left: 18px;
+        }
+
+        /* 5. Buttons & HUD */
+        .btn-action {
+            background: var(--accent);
+            color: #000;
+            transition: all 0.2s ease;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .btn-action:hover { background: #e0e0e0; transform: translateY(-1px); }
+        .btn-action:active { transform: translateY(0); }
+        .btn-action:disabled { background: #333; color: #666; }
+
+        /* 6. Context Menu */
+        #context-menu {
+            position: fixed;
+            display: none;
+            background: rgba(20, 20, 20, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid #444;
+            box-shadow: 0 15px 30px rgba(0,0,0,0.5);
+            z-index: 1000;
+            padding: 6px;
+            min-width: 180px;
+            border-radius: 12px;
+            transform: scale(0.9);
+            opacity: 0;
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s ease;
+        }
+        #context-menu.show { display: block; transform: scale(1); opacity: 1; }
+        .menu-item {
+            padding: 10px 14px;
+            font-size: 12px;
+            color: #aaa;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            border-radius: 8px;
+        }
+        .menu-item:hover { background: #333; color: #fff; padding-left: 18px; }
+        .menu-item span { margin-right: 10px; opacity: 0.5; }
+
+        /* 7. Toast & Animations */
+        .copy-toast {
+            position: fixed;
+            background: rgba(255, 255, 255, 0.9);
+            color: #000;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            pointer-events: none;
+            z-index: 2000;
+            animation: toast-up 0.8s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+        }
+        .slide-up {
+            transform: translateY(-150%);
+            opacity: 0;
+            transition: all 0.8s ease;
+        }
+        .result-block { cursor: pointer; position: relative; overflow: hidden; }
+        .result-block:active { transform: scale(0.98); }
+
+        [v-cloak] { display: none; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+<!-- Custom Context Menu -->
+<div id="context-menu">
+    <div class="menu-item" onclick="copyContent('idea')"><span>⎘</span> Copy Idea</div>
+    <div class="menu-item" onclick="copyContent('post')"><span>⎘</span> Copy Post</div>
+    <div class="menu-item" onclick="copyContent('all')"><span>⎘</span> Copy All Content</div>
+    <div class="menu-item" style="border-top: 1px solid #333; margin-top: 4px; padding-top: 8px;" onclick="window.location.reload()"><span>↻</span> Refresh System</div>
+</div>
+
+<div id="app" class="min-h-screen flex flex-col relative z-10">
+    <!-- Header -->
+    <header class="bg-black/90 border-b border-[#222] p-4 flex justify-between items-center backdrop-blur-md">
+        <h1 class="text-xl font-bold tracking-tighter text-white">CONTENT <span class="text-gray-500">MANAGER</span> AI</h1>
+        <div class="flex items-center space-x-3">
+            <div class="h-1.5 w-1.5 rounded-full bg-white animate-pulse"></div>
+            <div class="text-[10px] text-gray-500 uppercase tracking-[0.2em]">Core: Online</div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <main class="flex-grow container mx-auto p-6">
+        <div class="max-w-6xl mx-auto relative">
+            
+            <!-- 1. INPUT CONTAINER (Centered initially) -->
+            <div id="input-container" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md z-20">
+                <div class="panel p-6 rounded-ui shadow-2xl">
+                    <h3 class="text-xs font-bold mb-6 text-gray-400 tracking-widest uppercase text-center">Input Parameters</h3>
+                    <div class="space-y-5">
+                        <div>
+                            <label class="block text-[10px] uppercase tracking-widest text-gray-600 mb-2 text-center">Target Topic</label>
+                            <input id="input-topic" type="text" class="w-full rounded-ui p-3 text-sm" placeholder="Enter topic...">
+                        </div>
+                        <div class="flex flex-col space-y-3">
+                            <label class="block text-[10px] uppercase tracking-widest text-gray-600 mb-1 text-center">Style Protocol</label>
+                            <div class="custom-select" id="style-dropdown">
+                                <div class="select-trigger" id="style-trigger">Expert Mode</div>
+                                <ul class="options-list" id="style-options">
+                                    <li class="option" data-value="expert">Expert Mode</li>
+                                    <li class="option" data-value="funny">Funny / Sarcastic</li>
+                                    <li class="option" data-value="storyteller">Storyteller</li>
+                                    <li class="option" data-value="minimalist">Minimalist</li>
+                                </ul>
+                            </div>
+                            <input type="hidden" id="select-style" value="expert">
+                        </div>
+                        <button id="btn-generate" class="w-full btn-action py-4 rounded-ui text-xs uppercase tracking-widest mt-4">
+                            Initialize Generation
+                        </button>
+                        <div id="gen-loader" class="hidden flex flex-col items-center space-y-3 mt-6">
+                            <div class="loader ease-linear rounded-full border-2 border-t-2 border-gray-700 h-8 w-8"></div>
+                            <span class="text-[10px] text-gray-500 animate-pulse uppercase tracking-widest">Processing...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. RESULTS AREA (Initially hidden, below input) -->
+            <div id="results-area" class="opacity-0 transform translate-y-10 transition-all duration-1000 pt-24 lg:pt-0">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <!-- Left Side: Empty space for layout symmetry -->
+                    <div class="lg:col-span-1"></div>
+
+                    <!-- Right Side: Results -->
+                    <div class="lg:col-span-2 space-y-6">
+                        <div id="result-idea-block" class="result-block panel p-6 rounded-ui border-l-2 border-white" onclick="copyContent('idea')">
+                            <h4 class="text-gray-500 text-[10px] font-bold mb-2 uppercase tracking-widest">Top Idea (Click to copy)</h4>
+                            <p id="result-idea-text" class="text-xl font-light italic text-gray-200"></p>                        </div>
+
+                        <div id="result-post-block" class="result-block panel p-6 rounded-ui border-l-2 border-gray-500" onclick="copyContent('post')">
+                            <h4 class="text-gray-500 text-[10px] font-bold mb-2 uppercase tracking-widest">Generated Post Content (Click to copy)</h4>
+                            <p id="result-post-text" class="whitespace-pre-wrap text-gray-300 leading-relaxed text-sm"></p>                        </div>
+
+                        <div id="result-titles-block" class="result-block panel p-6 rounded-ui border-l-2 border-gray-700" onclick="copyContent('all')">
+                            <h4 class="text-gray-500 text-[10px] font-bold mb-2 uppercase tracking-widest">Catchy Titles (Click to copy all)</h4>
+                            <ul id="result-titles-list" class="list-none space-y-2 text-gray-400 text-sm"></ul>                        </div>
+
+                        <div id="result-hashtags-block" class="result-block panel p-6 rounded-ui border-l-2 border-gray-800" onclick="copyContent('all')">
+                            <h4 class="text-gray-500 text-[10px] font-bold mb-2 uppercase tracking-widest">Hashtags (Click to copy all)</h4>
+                            <p id="result-hashtags" class="text-gray-500 font-mono text-xs"></p>                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <footer class="bg-black/90 p-4 text-center text-gray-600 text-[10px] uppercase tracking-[0.3em]">
+        &copy; 2026 Content Manager AI // Neural Engine Active
+    </footer>
+</div>
+
+<script>
+    const btnGenerate = document.getElementById('btn-generate');
+    const inputTopic = document.getElementById('input-topic');
+    const selectStyle = document.getElementById('select-style');
+    const styleDropdown = document.getElementById('style-dropdown');
+    const styleTrigger = document.getElementById('style-trigger');
+    const styleOptions = document.querySelectorAll('#style-options .option');
+    const genLoader = document.getElementById('gen-loader');
+    const resultsArea = document.getElementById('results-area');
+    const inputContainer = document.getElementById('input-container');
+    const contextMenu = document.getElementById('context-menu');
+
+    // --- Custom Dropdown Logic ---
+    styleDropdown.addEventListener('click', (e) => {
+        e.stopPropagation();
+        styleDropdown.classList.toggle('open');
+    });
+
+    styleOptions.forEach(option => {
+        option.addEventListener('click', (e) => {
+            const val = option.getAttribute('data-value');
+            const text = option.innerText;
+            styleTrigger.innerText = text;
+            selectStyle.value = val;
+            styleDropdown.classList.remove('open');
+            e.stopPropagation();
+        });
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!styleDropdown.contains(e.target)) {
+            styleDropdown.classList.remove('open');
+        }
+    });
+
+    // --- Context Menu Logic ---
+    let currentTarget = null;
+
+    window.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        currentTarget = e.target;
+        contextMenu.style.display = 'block';
+        contextMenu.style.left = e.pageX + 'px';
+        contextMenu.style.top = e.pageY + 'px';
+        setTimeout(() => contextMenu.classList.add('show'), 10);
+    });
+
+    window.addEventListener('click', () => {
+        contextMenu.classList.remove('show');
+        setTimeout(() => { if (!contextMenu.classList.contains('show')) contextMenu.style.display = 'none'; }, 200);
+    });
+
+    async function copyContent(type) {
+        let text = '';
+        if (type === 'idea') text = document.getElementById('result-idea-text').innerText;
+        else if (type === 'post') text = document.getElementById('result-post-text').innerText;
+        else if (type === 'all') {
+            text = `IDEA: ${document.getElementById('result-idea-text').innerText}\\n\\n`;
+            text += `POST: ${document.getElementById('result-post-text').innerText}\\n\\n`;
+            text += `TITLES:\\n${Array.from(document.querySelectorAll('#result-titles-list li')).map(li => li.innerText).join('\\n')}\\n\\n`;
+            text += `HASHTAGS: ${document.getElementById('result-hashtags').innerText}`;
+        }
+
+        if (text) {
+            await navigator.clipboard.writeText(text);
+            showToast(type === 'all' ? 'All Copied!' : 'Copied!');
+        }
+    }
+
+    function showToast(message) {
+        const toast = document.createElement('div');
+        toast.className = 'copy-toast';
+        toast.innerText = message;
+        toast.style.left = (window.innerWidth / 2 - 40) + 'px';
+        toast.style.top = (window.innerHeight / 2) + 'px';
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 1000);
+    }
+
+    // --- Generation Logic ---
+    btnGenerate.addEventListener('click', async () => {
+        const topic = inputTopic.value.trim();
+        const style = selectStyle.value;
+        
+        if (!topic) {
+            alert('Please enter a topic');
+            return;
+        }
+
+        btnGenerate.disabled = true;
+        btnGenerate.classList.add('opacity-50');
+        genLoader.classList.remove('hidden');
+
+        try {
+            const response = await fetch('/api/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ topic, style })
+            });
+            
+            const data = await response.json();
+            if (data.error) throw new Error(data.error);
+
+            // 1. Animate Input Container Up
+            inputContainer.classList.add('slide-up');
+            
+            // 2. Wait for animation, then show results
+            setTimeout(() => {
+                document.getElementById('result-idea-text').textContent = data.ideas[0];
+                document.getElementById('result-post-text').textContent = data.post_text;
+                
+                const list = document.getElementById('result-titles-list');
+                list.innerHTML = '';
+                data.titles.forEach(t => {
+                    const li = document.createElement('li');
+                    li.className = "flex items-start text-sm";
+                    li.innerHTML = `<span class="text-gray-600 mr-2">»</span> ${t}`;
+                    list.appendChild(li);
+                });
+
+                document.getElementById('result-hashtags').textContent = data.hashtags;
+                
+                // Show results with fade-in
+                resultsArea.classList.remove('hidden');
+                resultsArea.classList.add('opacity-100', 'translate-y-0');
+            }, 600);
+
+        } catch (err) {
+            console.error(err);
+            alert('System Error: ' + err.message);
+            // Reset input container if error occurs
+            inputContainer.classList.remove('slide-up');
+        } finally {
+            btnGenerate.disabled = false;
+            btnGenerate.classList.remove('opacity-50');
+            genLoader.classList.add('hidden');
+        }
+    });
+</script>
+</body>
+</html>
